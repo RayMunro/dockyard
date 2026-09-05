@@ -1,7 +1,11 @@
+<p align="center">
+  <img src="public/icon.png" width="160" alt="Dockyard icon" />
+</p>
+
 # Dockyard
 
 A minimal, self-hosted tiled launcher dashboard for your favorite apps. Add apps
-with a name, URL, and icon; Alternatively from a dropdown list of your Dockers,show/hide them; drag to rearrange. Everything is
+with a name, URL, and icon; Alternatively from a dropdown list of your Dockers, show/hide them; drag to rearrange. Everything is
 stored in a single `apps.json` file on a mounted volume.
 
 Copyright © 2026 Ray Munro. Licensed under the [GNU GPLv3](LICENSE).
