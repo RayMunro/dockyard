@@ -1,0 +1,16 @@
+{
+  "name": "dockyard",
+  "version": "1.0.0",
+  "description": "Dockyard - tiled dashboard for launching favorite Docker apps on Unraid",
+  "main": "index.js",
+  "author": "Ray Munro",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^5.0.0",
+    "express-session": "^1.18.1",
+    "multer": "^2.0.0"
+  }
+}

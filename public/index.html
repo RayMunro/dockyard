@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dockyard</title>
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="bgOverlay" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <h1>Dockyard</h1>
+    <div class="topbar-actions">
+      <button id="changePasswordBtn" class="btn" hidden>Change Password</button>
+      <button id="lockBtn" class="btn" hidden></button>
+      <button id="backgroundBtn" class="btn" hidden>Set Background</button>
+      <button id="editToggleBtn" class="btn">Edit Layout</button>
+      <button id="addAppBtn" class="btn btn-primary">+ Add App</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="emptyState" class="empty-state" hidden>
+      <p>No apps yet. Click "Add App" to get started.</p>
+    </div>
+    <div id="tileGrid" class="tile-grid"></div>
+  </main>
+
+  <footer class="app-footer">Dockyard &copy; 2026 Ray Munro</footer>
+
+  <!-- Add / Edit App Modal -->
+  <div id="appModal" class="modal-overlay" hidden>
+    <div class="modal">
+      <h2 id="modalTitle">Add App</h2>
+      <button type="button" id="pickDockerBtn" class="btn docker-picker-toggle">Pick from Running Containers</button>
+      <div id="dockerPickerList" class="docker-picker-list" hidden></div>
+      <form id="appForm">
+        <input type="hidden" id="appId" />
+        <label>
+          Name
+          <input type="text" id="appName" required maxlength="60" placeholder="e.g. Sonarr" />
+        </label>
+        <label>
+          URL
+          <input type="text" id="appUrl" required placeholder="https://192.168.1.10:8989" />
+        </label>
+        <label>
+          Icon URL
+          <input type="text" id="appIconUrl" placeholder="https://example.com/icon.png" />
+        </label>
+        <div class="or-divider">or</div>
+        <label>
+          Upload Icon
+          <input type="file" id="appIconFile" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/x-icon,image/gif" />
+        </label>
+        <div id="iconPreviewWrap" class="icon-preview-wrap" hidden>
+          <img id="iconPreview" class="icon-preview" alt="icon preview" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="cancelBtn" class="btn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Password Modal -->
+  <div id="passwordModal" class="modal-overlay" hidden>
+    <div class="modal">
+      <h2>Unlock Editing</h2>
+      <form id="passwordForm">
+        <label>
+          Password
+          <input type="password" id="passwordInput" required autocomplete="current-password" />
+        </label>
+        <p id="passwordError" class="form-error" hidden></p>
+        <div class="modal-actions">
+          <button type="button" id="passwordCancelBtn" class="btn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Unlock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Change Password Modal -->
+  <div id="changePasswordModal" class="modal-overlay" hidden>
+    <div class="modal">
+      <h2>Set a New Password</h2>
+      <p id="changePasswordNotice" class="modal-notice" hidden>
+        You're using the initial password. Choose a new one before making changes.
+      </p>
+      <form id="changePasswordForm">
+        <label>
+          New password
+          <input type="password" id="newPasswordInput" required autocomplete="new-password" minlength="4" />
+        </label>
+        <label>
+          Confirm new password
+          <input type="password" id="confirmPasswordInput" required autocomplete="new-password" minlength="4" />
+        </label>
+        <p id="changePasswordError" class="form-error" hidden></p>
+        <div class="modal-actions">
+          <button type="button" id="changePasswordCancelBtn" class="btn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Background Modal -->
+  <div id="backgroundModal" class="modal-overlay" hidden>
+    <div class="modal">
+      <h2>Set Background</h2>
+      <label>
+        Background image
+        <input type="file" id="backgroundFileInput" accept="image/png,image/jpeg,image/webp,image/gif" />
+      </label>
+      <div id="backgroundPreviewWrap" class="background-preview-wrap" hidden>
+        <img id="backgroundPreview" class="background-preview" alt="background preview" />
+      </div>
+      <p id="backgroundError" class="form-error" hidden></p>
+      <div class="modal-actions">
+        <button type="button" id="removeBackgroundBtn" class="btn btn-danger">Remove Background</button>
+        <button type="button" id="backgroundCancelBtn" class="btn">Cancel</button>
+        <button type="button" id="saveBackgroundBtn" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
