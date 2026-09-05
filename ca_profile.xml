@@ -1,0 +1,14 @@
+<CommunityApplications>
+  <!-- Required profile -->
+  <Profile>
+Dockyard is a minimal, self-hosted tiled launcher dashboard for your favorite Docker apps. Add tiles by hand (name, URL, icon) or pick them straight from your running containers, rearrange them by drag-and-drop, and optionally lock editing behind a password. This repository contains the single Dockyard application.
+
+Support and bug reports: https://github.com/RayMunro/dockyard/issues
+  </Profile>
+  <!-- Optional icon -->
+  <Icon>https://raw.githubusercontent.com/RayMunro/dockyard/main/public/icon.png</Icon>
+  <!-- Optional web page -->
+  <WebPage>https://github.com/RayMunro/dockyard</WebPage>
+  <!-- Optional support and donation links -->
+  <Forum>https://github.com/RayMunro/dockyard/issues</Forum>
+</CommunityApplications>
