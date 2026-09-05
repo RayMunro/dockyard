@@ -1,0 +1,33 @@
+services:
+  dockyard:
+    build: .
+    image: dockyard:latest
+    container_name: dockyard
+    ports:
+      - "8090:3000"
+    volumes:
+      - ./data:/data
+      # Uncomment to enable "Pick from Running Containers" in the Add App
+      # form. NOTE: even mounted ":ro", this grants Dockyard's process the
+      # same level of control over Docker on this host as root would have —
+      # our code only ever calls the read-only list-containers endpoint, but
+      # anyone who compromised Dockyard would inherit that full access too.
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Uncomment to require a password before any change (add/edit/delete/
+    # reorder/hide) can be made. Leave unset for open editing.
+    # environment:
+    #   - EDIT_PASSWORD=changeme
+    restart: unless-stopped
+    labels:
+      # Makes Unraid's Docker tab show a WebUI button/icon for this
+      # container even though it wasn't created from an Unraid template.
+      net.unraid.docker.managed: dockerman
+      net.unraid.docker.webui: 'http://[IP]:[PORT:8090]/'
+      # The [IP]/[PORT] macros only get resolved for the WebUI *link* at
+      # click-time, not here — Unraid fetches this icon server-side to cache
+      # it, and only accepts a real, resolvable http(s) URL (a data: URI
+      # fails that fetch). Use your Unraid box's mDNS hostname if it has one
+      # (avahi is on by default — check with `avahi-resolve -n <name>.local`
+      # or just try pinging it) so this survives DHCP reassignment; fall back
+      # to its LAN IP if mDNS isn't reliable on your network.
+      net.unraid.docker.icon: 'http://YOUR-UNRAID-HOSTNAME.local:8090/icon.png'
