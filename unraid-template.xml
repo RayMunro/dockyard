@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>dockyard</Name>
+  <Repository>dockyard:latest</Repository>
+  <Registry/>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Project/>
+  <Overview>Dockyard - a tiled launcher dashboard for your favorite Docker apps. Add tiles with a name, URL and icon (or pick from running containers), show/hide and drag to rearrange, and optionally lock changes behind a password.</Overview>
+  <Category>Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8090]/</WebUI>
+  <TemplateURL/>
+  <!-- Uses the box's mDNS hostname (avahi, on by default on Unraid)
+       rather than its IP, so this survives DHCP reassignment. Unraid
+       fetches this server-side to cache it, and a literal [IP]/[PORT]
+       macro (which only resolves for the WebUI *link*, at click-time)
+       or an embedded data: URI both failed that fetch in testing -
+       only a real, resolvable http(s) URL works here. Replace
+       YOUR-UNRAID-HOSTNAME with your own box's hostname, or its LAN IP if
+       mDNS isn't reliable on your network. -->
+  <Icon>http://YOUR-UNRAID-HOSTNAME.local:8090/icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="WebUI Port" Target="3000" Default="8090" Mode="tcp" Description="Port to reach the Dockyard web interface on" Type="Port" Display="always" Required="true" Mask="false">8090</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/dockyard" Mode="rw" Description="Persistent storage for your app list, icons, background image, and password" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/dockyard</Config>
+  <Config Name="Edit Password" Target="EDIT_PASSWORD" Default="" Mode="" Description="Optional: sets an initial password required before any changes can be made (you'll be forced to change it on first use). Leave blank for open editing." Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="Docker Socket (optional)" Target="/var/run/docker.sock" Default="" Mode="ro" Description="Optional: mount to enable 'Pick from Running Containers' in the Add App form. Security note: even mounted read-only, this gives Dockyard's process full control over Docker on this host - leave blank to skip." Type="Path" Display="always" Required="false" Mask="false"></Config>
+</Container>
