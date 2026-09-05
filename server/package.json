@@ -4,7 +4,7 @@
   "description": "Dockyard - tiled dashboard for launching favorite Docker apps on Unraid",
   "main": "index.js",
   "author": "Ray Munro",
-  "license": "UNLICENSED",
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "start": "node index.js"
   },
