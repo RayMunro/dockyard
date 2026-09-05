@@ -71,14 +71,17 @@ Adding it through this form (rather than the labels in Option B) also gets you
 a proper Unraid template, so the container shows up with full Edit/icon support
 like any other app.
 
-### Option D: use the included Unraid template (recommended if you built via Option B)
+### Option D: use the included Unraid template
 
-`unraid-template.xml` in this repo is a ready-made Unraid template with proper
-fields for the WebUI port, data path, optional `EDIT_PASSWORD`, and the
-optional Docker socket mount. Copy it to Unraid's user-templates folder:
+`templates/dockyard.xml` in this repo is a ready-made Unraid template with
+proper fields for the WebUI port, data path, optional `EDIT_PASSWORD`, and the
+optional Docker socket mount, pointing at the prebuilt image published to
+GitHub Container Registry (see below) — no local build required. Copy it to
+Unraid's user-templates folder:
 
 ```bash
-scp unraid-template.xml root@<unraid-ip>:/boot/config/plugins/dockerMan/templates-user/my-dockyard.xml
+curl -o /boot/config/plugins/dockerMan/templates-user/my-dockyard.xml \
+  https://raw.githubusercontent.com/RayMunro/dockyard/main/templates/dockyard.xml
 ```
 
 This does two things without touching a running container:
@@ -89,30 +92,30 @@ This does two things without touching a running container:
   installing fresh presents the same configuration screen — letting you
   change the port, path, or password before the container is even created.
 
-The template's `<Icon>` uses a `YOUR-UNRAID-HOSTNAME.local` placeholder — edit
-it to your own Unraid box's mDNS hostname before copying it over (try pinging
-`<hostname>.local`; avahi is on by default on Unraid). Two things that *don't*
-work here, in case you're tempted: the `[IP]`/`[PORT]` macros only resolve for
-the `<WebUI>` link at click-time (this is a plain `<img>` tag with no such
-substitution), and a `data:` URI with the icon embedded directly also fails —
-Unraid fetches this value server-side to cache it, and its fetcher only
-accepts real http(s) URLs. A hostname avoids hardcoding an IP that breaks on
-the next DHCP reassignment; fall back to the literal IP if mDNS isn't reliable
-on your network.
+If you built the image locally instead (Option B) and want the template to
+use that rather than pulling from the registry, edit the `Repository` field
+to `dockyard:latest` after copying the template over.
 
-**If the icon still shows as a broken/question-mark placeholder after fixing
-the URL**, that's Unraid's own caching, not your config: it downloads a
-container's icon once and never retries once *any* file is cached for it
-(including the fallback placeholder from an earlier bad URL). Force a refresh
-with the same script "Check for Updates" uses:
+**If the icon ever shows as a broken/question-mark placeholder**, that's
+Unraid's own caching, not your config: it downloads a container's icon once
+and never retries once *any* file is cached for it. Force a refresh with the
+same script "Check for Updates" uses:
 ```bash
 /usr/local/emhttp/plugins/dynamix.docker.manager/scripts/dockerupdate nonotify
 ```
 
-Note the `Repository` field is `dockyard:latest`, which only exists once
-you've built it locally (Option B) — this template doesn't publish the image
-anywhere, so "installing fresh" only works on a box where you've already run
-`docker build`.
+## Prebuilt image
+
+Every push to `main` builds and publishes the image to GitHub Container
+Registry via [a GitHub Actions workflow](.github/workflows/docker-publish.yml):
+
+```
+ghcr.io/raymunro/dockyard:latest
+```
+
+This is what `templates/dockyard.xml` and the Community Applications listing
+use — you don't need Docker installed anywhere to run Dockyard this way,
+just `docker run` or Unraid's own container UI pointed at that image.
 
 ## Using it
 
