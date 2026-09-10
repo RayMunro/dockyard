@@ -10,6 +10,8 @@ stored in a single `apps.json` file on a mounted volume.
 
 Copyright © 2026 Ray Munro. Licensed under the [GNU GPLv3](LICENSE).
 
+*** Note the initial password if set is "password". ***
+
 ## Running on Unraid
 
 The easiest path is Unraid's **Docker Compose Manager** plugin (available in
@@ -192,7 +194,7 @@ on the mounted volume, so:
 - It survives container restarts and updates.
 - Changing or removing `EDIT_PASSWORD` afterward has no effect — it's only
   read when no password has been set yet.
-- You can rotate the password anytime afterward via the **Change Password**
+- You can edit the password anytime afterward via the **Change Password**
   button that appears in the top bar once unlocked.
 - To fully reset (e.g. you forgot the password), delete `auth.json` from the
   data volume and restart the container with `EDIT_PASSWORD` set again.
