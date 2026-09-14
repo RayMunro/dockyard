@@ -23,7 +23,13 @@
   <DonateLink/>
   <Requires/>
   <License>GPL-3.0-or-later</License>
+  <Date>2026-09-14</Date>
   <Changes>
+    ### 2026-09-14
+    - Groups: assign apps to named sections (Media, Admin, etc.), with drag-and-drop between groups in Edit Layout
+    - Search: filter tiles by name from the top bar, or press / to jump to it
+    - Status dots: each tile shows reachability at a glance - a live HTTP check, or actual container running/stopped state for apps linked via the Docker picker
+
     ### 2026-09-05
     Initial release
   </Changes>
