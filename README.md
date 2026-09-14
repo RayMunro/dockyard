@@ -126,8 +126,20 @@ just `docker run` or Unraid's own container UI pointed at that image.
   A good source for app icons is https://dashboardicons.com or the app's own
   favicon (e.g. `http://192.168.1.10:8989/favicon.ico`).
 - **Edit Layout** — reveals hide/edit/delete controls on every tile (including
-  hidden ones) and lets you drag tiles into any order. Click **Done** to return
-  to the normal launcher view, which only shows enabled tiles in your chosen order.
+  hidden ones) and lets you drag tiles into any order, or between groups. Click
+  **Done** to return to the normal launcher view, which only shows enabled
+  tiles in your chosen order.
+- **Groups** — set an optional Group on any app (free text, with autocomplete
+  from groups you've already used) to section tiles under a header. Apps with
+  no group render together with no header, same as before groups existed.
+- **Search** — the box in the top bar filters tiles by name as you type; press
+  `/` anywhere to jump to it. Disabled while in Edit Layout, since hiding
+  tiles there would drop them from a drag-reorder.
+- A colored dot on each tile's icon shows whether it's reachable: green/red
+  from a periodic HTTP check, or — for apps picked from the Docker container
+  list — whether that container is actually running, which is checked instead
+  of the HTTP status when available. Checked every 60 seconds in the
+  background; the dashboard itself never blocks waiting on a slow app.
 - Clicking a tile in normal mode opens its URL in a new tab.
 
 All data lives in `/data/apps.json` and `/data/icons/` inside the container —
