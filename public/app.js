@@ -7,8 +7,11 @@ const appModal = document.getElementById('appModal');
 const appForm = document.getElementById('appForm');
 const modalTitle = document.getElementById('modalTitle');
 const appIdField = document.getElementById('appId');
+const appContainerNameField = document.getElementById('appContainerName');
 const appNameField = document.getElementById('appName');
 const appUrlField = document.getElementById('appUrl');
+const appGroupField = document.getElementById('appGroup');
+const groupOptionsDatalist = document.getElementById('groupOptions');
 const appIconUrlField = document.getElementById('appIconUrl');
 const appIconFileField = document.getElementById('appIconFile');
 const iconPreviewWrap = document.getElementById('iconPreviewWrap');
@@ -42,21 +45,58 @@ const backgroundError = document.getElementById('backgroundError');
 const removeBackgroundBtn = document.getElementById('removeBackgroundBtn');
 const backgroundCancelBtn = document.getElementById('backgroundCancelBtn');
 const saveBackgroundBtn = document.getElementById('saveBackgroundBtn');
+const searchInput = document.getElementById('searchInput');
 
 let apps = [];
 let editMode = false;
 let currentEditIcon = '';
-let sortableInstance = null;
+let sortableInstances = [];
 let authRequired = false;
 let unlocked = false;
 let mustChange = false;
 let pendingAction = null;
 let settings = { background: null };
+let searchTerm = '';
+let statusMap = {};
 
 async function fetchApps() {
   const res = await fetch('/api/apps');
   apps = await res.json();
+  updateGroupOptions();
   render();
+}
+
+function updateGroupOptions() {
+  const groups = [...new Set(apps.map((a) => a.group).filter(Boolean))].sort();
+  groupOptionsDatalist.innerHTML = '';
+  groups.forEach((g) => {
+    const opt = document.createElement('option');
+    opt.value = g;
+    groupOptionsDatalist.appendChild(opt);
+  });
+}
+
+async function fetchStatus() {
+  const res = await fetch('/api/status');
+  statusMap = await res.json().catch(() => ({}));
+  applyStatusDots();
+}
+
+function applyStatusDots() {
+  document.querySelectorAll('.status-dot').forEach((dot) => {
+    const info = statusMap[dot.dataset.statusFor];
+    dot.classList.remove('up', 'down');
+    if (!info || info.state === 'unknown') {
+      dot.title = 'Status unknown';
+      return;
+    }
+    dot.classList.add(info.state);
+    if (info.state === 'up') {
+      dot.title = info.source === 'docker' ? 'Container running' : 'Reachable';
+    } else {
+      dot.title = info.source === 'docker' ? 'Container stopped' : 'Unreachable';
+    }
+  });
 }
 
 async function fetchSettings() {
@@ -247,85 +287,160 @@ function normalizeUrl(value) {
   return trimmed;
 }
 
+function buildTile(a) {
+  const tile = document.createElement(editMode ? 'div' : 'a');
+  tile.className = 'tile' + (!a.enabled ? ' disabled' : '');
+  tile.dataset.id = a.id;
+  if (!editMode) {
+    tile.href = a.url;
+    tile.target = '_blank';
+    tile.rel = 'noopener noreferrer';
+  }
+
+  const iconWrap = document.createElement('div');
+  iconWrap.className = 'tile-icon-wrap';
+
+  let iconEl;
+  if (a.icon) {
+    iconEl = document.createElement('img');
+    iconEl.className = 'tile-icon';
+    iconEl.src = a.icon;
+    iconEl.alt = '';
+    iconEl.onerror = () => {
+      const fallback = buildFallbackIcon(a.name);
+      iconEl.replaceWith(fallback);
+    };
+  } else {
+    iconEl = buildFallbackIcon(a.name);
+  }
+  iconWrap.appendChild(iconEl);
+
+  const dot = document.createElement('span');
+  dot.className = 'status-dot';
+  dot.dataset.statusFor = a.id;
+  dot.title = 'Status unknown';
+  iconWrap.appendChild(dot);
+
+  tile.appendChild(iconWrap);
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'tile-name';
+  nameEl.textContent = a.name;
+  tile.appendChild(nameEl);
+
+  if (editMode) {
+    const controls = document.createElement('div');
+    controls.className = 'tile-controls';
+
+    const visBtn = document.createElement('button');
+    visBtn.type = 'button';
+    visBtn.className = 'tile-control-btn';
+    visBtn.title = a.enabled ? 'Hide from dashboard' : 'Show on dashboard';
+    visBtn.textContent = a.enabled ? '–' : '+';
+    visBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleEnabled(a);
+    });
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'tile-control-btn';
+    editBtn.title = 'Edit';
+    editBtn.textContent = '✎';
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditModal(a);
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'tile-control-btn';
+    delBtn.title = 'Delete';
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteApp(a);
+    });
+
+    controls.append(visBtn, editBtn, delBtn);
+    tile.appendChild(controls);
+  }
+
+  return tile;
+}
+
 function render() {
-  const visibleApps = editMode ? apps : apps.filter((a) => a.enabled);
+  // Search is ignored in edit mode: hiding filtered-out tiles would drop them
+  // from the drag-reorder payload, since that's built from what's in the DOM.
+  const term = editMode ? '' : searchTerm.trim().toLowerCase();
+  let visibleApps = editMode ? apps : apps.filter((a) => a.enabled);
+  if (term) {
+    visibleApps = visibleApps.filter((a) => a.name.toLowerCase().includes(term));
+  }
   emptyState.hidden = apps.length > 0;
   tileGrid.innerHTML = '';
   tileGrid.classList.toggle('edit-mode', editMode);
   backgroundBtn.hidden = !editMode;
+  searchInput.disabled = editMode;
+  searchInput.placeholder = editMode ? 'Search disabled while editing' : 'Search… (press /)';
 
+  const groupOrder = [];
+  const byGroup = new Map();
   visibleApps.forEach((a) => {
-    const tile = document.createElement(editMode ? 'div' : 'a');
-    tile.className = 'tile' + (!a.enabled ? ' disabled' : '');
-    tile.dataset.id = a.id;
-    if (!editMode) {
-      tile.href = a.url;
-      tile.target = '_blank';
-      tile.rel = 'noopener noreferrer';
+    const g = a.group || '';
+    if (!byGroup.has(g)) {
+      byGroup.set(g, []);
+      groupOrder.push(g);
+    }
+    byGroup.get(g).push(a);
+  });
+  // Keep an ungrouped drop zone available in edit mode even when it's empty,
+  // so tiles can always be dragged out of a group back to "no group".
+  if (editMode && !byGroup.has('')) {
+    byGroup.set('', []);
+    groupOrder.unshift('');
+  }
+
+  sortableInstances.forEach((s) => s.destroy());
+  sortableInstances = [];
+
+  groupOrder.forEach((groupName) => {
+    const groupApps = byGroup.get(groupName);
+
+    const section = document.createElement('section');
+    section.className = 'tile-group';
+
+    if (groupName) {
+      const header = document.createElement('h2');
+      header.className = 'tile-group-header';
+      header.textContent = groupName;
+      section.appendChild(header);
+    } else if (editMode && groupOrder.length > 1) {
+      const header = document.createElement('h2');
+      header.className = 'tile-group-header';
+      header.textContent = 'Ungrouped';
+      section.appendChild(header);
     }
 
-    let iconEl;
-    if (a.icon) {
-      iconEl = document.createElement('img');
-      iconEl.className = 'tile-icon';
-      iconEl.src = a.icon;
-      iconEl.alt = '';
-      iconEl.onerror = () => {
-        const fallback = buildFallbackIcon(a.name);
-        iconEl.replaceWith(fallback);
-      };
-    } else {
-      iconEl = buildFallbackIcon(a.name);
-    }
-    tile.appendChild(iconEl);
-
-    const nameEl = document.createElement('div');
-    nameEl.className = 'tile-name';
-    nameEl.textContent = a.name;
-    tile.appendChild(nameEl);
+    const grid = document.createElement('div');
+    grid.className = 'tile-grid';
+    grid.dataset.group = groupName;
+    groupApps.forEach((a) => grid.appendChild(buildTile(a)));
+    section.appendChild(grid);
+    tileGrid.appendChild(section);
 
     if (editMode) {
-      const controls = document.createElement('div');
-      controls.className = 'tile-controls';
-
-      const visBtn = document.createElement('button');
-      visBtn.type = 'button';
-      visBtn.className = 'tile-control-btn';
-      visBtn.title = a.enabled ? 'Hide from dashboard' : 'Show on dashboard';
-      visBtn.textContent = a.enabled ? '–' : '+';
-      visBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleEnabled(a);
-      });
-
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'tile-control-btn';
-      editBtn.title = 'Edit';
-      editBtn.textContent = '✎';
-      editBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openEditModal(a);
-      });
-
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'tile-control-btn';
-      delBtn.title = 'Delete';
-      delBtn.textContent = '✕';
-      delBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        deleteApp(a);
-      });
-
-      controls.append(visBtn, editBtn, delBtn);
-      tile.appendChild(controls);
+      sortableInstances.push(
+        new Sortable(grid, {
+          animation: 150,
+          group: 'dockyard-tiles',
+          onEnd: handleReorderEnd,
+        })
+      );
     }
-
-    tileGrid.appendChild(tile);
   });
 
-  setupSortable();
+  applyStatusDots();
 }
 
 function buildFallbackIcon(name) {
@@ -335,24 +450,18 @@ function buildFallbackIcon(name) {
   return div;
 }
 
-function setupSortable() {
-  if (sortableInstance) {
-    sortableInstance.destroy();
-    sortableInstance = null;
-  }
-  if (!editMode) return;
-  sortableInstance = new Sortable(tileGrid, {
-    animation: 150,
-    onEnd: async () => {
-      const order = [...tileGrid.children].map((el) => el.dataset.id);
-      await authedFetch('/api/apps/reorder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order }),
-      });
-      await fetchApps();
-    },
+async function handleReorderEnd() {
+  const order = [];
+  tileGrid.querySelectorAll('.tile-grid').forEach((grid) => {
+    const group = grid.dataset.group;
+    [...grid.children].forEach((el) => order.push({ id: el.dataset.id, group }));
   });
+  await authedFetch('/api/apps/reorder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order }),
+  });
+  await fetchApps();
 }
 
 async function toggleEnabled(a) {
@@ -373,8 +482,10 @@ async function deleteApp(a) {
 function openAddModal() {
   modalTitle.textContent = 'Add App';
   appIdField.value = '';
+  appContainerNameField.value = '';
   appNameField.value = '';
   appUrlField.value = '';
+  appGroupField.value = '';
   appIconUrlField.value = '';
   appIconFileField.value = '';
   currentEditIcon = '';
@@ -387,8 +498,10 @@ function openAddModal() {
 function openEditModal(a) {
   modalTitle.textContent = 'Edit App';
   appIdField.value = a.id;
+  appContainerNameField.value = a.containerName || '';
   appNameField.value = a.name;
   appUrlField.value = a.url;
+  appGroupField.value = a.group || '';
   appIconUrlField.value = a.icon && a.icon.startsWith('http') ? a.icon : '';
   appIconFileField.value = '';
   currentEditIcon = a.icon || '';
@@ -449,7 +562,7 @@ appForm.addEventListener('submit', async (e) => {
     icon = uploadData.icon;
   }
 
-  const payload = { name, url, icon };
+  const payload = { name, url, icon, group: appGroupField.value.trim(), containerName: appContainerNameField.value || null };
 
   const res = await authedFetch(id ? `/api/apps/${id}` : '/api/apps', {
     method: id ? 'PUT' : 'POST',
@@ -476,6 +589,7 @@ addAppBtn.addEventListener('click', () => ensureUnlocked(openAddModal));
 
 function selectDockerContainer(container) {
   appNameField.value = container.name;
+  appContainerNameField.value = container.name;
   appUrlField.value = container.ports.length
     ? `http://${window.location.hostname}:${container.ports[0]}`
     : '';
@@ -609,6 +723,24 @@ backgroundModal.addEventListener('click', (e) => {
   if (e.target === backgroundModal) closeBackgroundModal();
 });
 
+searchInput.addEventListener('input', () => {
+  searchTerm = searchInput.value;
+  render();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== '/' || document.activeElement === searchInput) return;
+  const tag = document.activeElement.tagName;
+  const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement.isContentEditable;
+  if (isTyping) return;
+  e.preventDefault();
+  searchInput.focus();
+});
+
+const STATUS_POLL_INTERVAL_MS = 30 * 1000;
+
 fetchAuthStatus();
 fetchApps();
 fetchSettings();
+fetchStatus();
+setInterval(fetchStatus, STATUS_POLL_INTERVAL_MS);

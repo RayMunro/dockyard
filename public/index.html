@@ -13,6 +13,9 @@
 
   <header class="topbar">
     <h1>Dockyard</h1>
+    <div class="topbar-search">
+      <input type="text" id="searchInput" placeholder="Search… (press /)" aria-label="Search apps" />
+    </div>
     <div class="topbar-actions">
       <button id="changePasswordBtn" class="btn" hidden>Change Password</button>
       <button id="lockBtn" class="btn" hidden></button>
@@ -26,7 +29,7 @@
     <div id="emptyState" class="empty-state" hidden>
       <p>No apps yet. Click "Add App" to get started.</p>
     </div>
-    <div id="tileGrid" class="tile-grid"></div>
+    <div id="tileGrid" class="tile-groups"></div>
   </main>
 
   <footer class="app-footer">Dockyard &copy; 2026 Ray Munro</footer>
@@ -39,6 +42,7 @@
       <div id="dockerPickerList" class="docker-picker-list" hidden></div>
       <form id="appForm">
         <input type="hidden" id="appId" />
+        <input type="hidden" id="appContainerName" />
         <label>
           Name
           <input type="text" id="appName" required maxlength="60" placeholder="e.g. Sonarr" />
@@ -46,6 +50,11 @@
         <label>
           URL
           <input type="text" id="appUrl" required placeholder="https://192.168.1.10:8989" />
+        </label>
+        <label>
+          Group <span class="label-hint">(optional)</span>
+          <input type="text" id="appGroup" list="groupOptions" maxlength="40" placeholder="e.g. Media" />
+          <datalist id="groupOptions"></datalist>
         </label>
         <label>
           Icon URL

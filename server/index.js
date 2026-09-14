@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const http = require('http');
+const https = require('https');
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const DOCKER_SOCKET_PATH = process.env.DOCKER_SOCKET_PATH || '/var/run/docker.sock';
@@ -240,7 +241,7 @@ app.get('/api/apps', (req, res) => {
 
 // Create a new app
 app.post('/api/apps', requireAuth, (req, res) => {
-  const { name, url, icon } = req.body || {};
+  const { name, url, icon, group, containerName } = req.body || {};
   if (typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name is required' });
   }
@@ -250,6 +251,12 @@ app.post('/api/apps', requireAuth, (req, res) => {
   if (icon !== undefined && icon !== '' && typeof icon !== 'string') {
     return res.status(400).json({ error: 'icon must be a string' });
   }
+  if (group !== undefined && typeof group !== 'string') {
+    return res.status(400).json({ error: 'group must be a string' });
+  }
+  if (containerName !== undefined && containerName !== null && typeof containerName !== 'string') {
+    return res.status(400).json({ error: 'containerName must be a string' });
+  }
 
   const maxOrder = apps.reduce((max, a) => Math.max(max, a.order), -1);
   const newApp = {
@@ -257,20 +264,23 @@ app.post('/api/apps', requireAuth, (req, res) => {
     name: name.trim(),
     url: url.trim(),
     icon: icon ? icon.trim() : '',
+    group: group ? group.trim() : '',
+    containerName: containerName ? containerName.trim() : null,
     enabled: true,
     order: maxOrder + 1,
   };
   apps.push(newApp);
   saveApps(apps);
+  refreshStatus();
   res.status(201).json(newApp);
 });
 
-// Update an app (name, url, icon, enabled)
+// Update an app (name, url, icon, group, containerName, enabled)
 app.put('/api/apps/:id', requireAuth, (req, res) => {
   const existing = apps.find((a) => a.id === req.params.id);
   if (!existing) return res.status(404).json({ error: 'not found' });
 
-  const { name, url, icon, enabled } = req.body || {};
+  const { name, url, icon, group, containerName, enabled } = req.body || {};
   if (name !== undefined) {
     if (typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'name must be a non-empty string' });
@@ -287,10 +297,21 @@ app.put('/api/apps/:id', requireAuth, (req, res) => {
     if (typeof icon !== 'string') return res.status(400).json({ error: 'icon must be a string' });
     existing.icon = icon.trim();
   }
+  if (group !== undefined) {
+    if (typeof group !== 'string') return res.status(400).json({ error: 'group must be a string' });
+    existing.group = group.trim();
+  }
+  if (containerName !== undefined) {
+    if (containerName !== null && typeof containerName !== 'string') {
+      return res.status(400).json({ error: 'containerName must be a string' });
+    }
+    existing.containerName = containerName ? containerName.trim() : null;
+  }
   if (enabled !== undefined) {
     existing.enabled = Boolean(enabled);
   }
   saveApps(apps);
+  refreshStatus();
   res.json(existing);
 });
 
@@ -300,19 +321,26 @@ app.delete('/api/apps/:id', requireAuth, (req, res) => {
   if (idx === -1) return res.status(404).json({ error: 'not found' });
   apps.splice(idx, 1);
   saveApps(apps);
+  refreshStatus();
   res.status(204).end();
 });
 
-// Reorder apps: body = { order: [id1, id2, id3, ...] }
+// Reorder apps and/or move them between groups in one shot:
+// body = { order: [{ id, group }, ...] }
 app.post('/api/apps/reorder', requireAuth, (req, res) => {
   const { order } = req.body || {};
   if (!Array.isArray(order)) {
-    return res.status(400).json({ error: 'order must be an array of ids' });
+    return res.status(400).json({ error: 'order must be an array' });
   }
   const byId = new Map(apps.map((a) => [a.id, a]));
-  order.forEach((id, index) => {
+  order.forEach((entry, index) => {
+    const id = typeof entry === 'string' ? entry : entry?.id;
     const a = byId.get(id);
-    if (a) a.order = index;
+    if (!a) return;
+    a.order = index;
+    if (typeof entry === 'object' && typeof entry.group === 'string') {
+      a.group = entry.group.trim();
+    }
   });
   saveApps(apps);
   res.json([...apps].sort((a, b) => a.order - b.order));
@@ -409,6 +437,69 @@ app.get('/api/docker/containers', requireAuth, async (req, res) => {
       error: 'Could not reach the Docker socket. Mount /var/run/docker.sock into this container to enable this.',
     });
   }
+});
+
+// --- Status engine: HTTP reachability + live Docker container state -------
+// Runs periodically in the background; GET /api/status just reads the
+// latest cached result rather than checking on-demand, so viewing the
+// dashboard never blocks on a slow or dead app.
+
+const HEALTH_CHECK_TIMEOUT_MS = 5000;
+const STATUS_REFRESH_INTERVAL_MS = 60 * 1000;
+let statusMap = {}; // appId -> { state: 'up'|'down'|'unknown', source: 'http'|'docker' }
+
+function checkHttpHealth(url) {
+  return new Promise((resolve) => {
+    let target;
+    try {
+      target = new URL(url);
+    } catch {
+      return resolve('down');
+    }
+    const client = target.protocol === 'https:' ? https : http;
+    const req = client.request(
+      target,
+      { method: 'GET', timeout: HEALTH_CHECK_TIMEOUT_MS, rejectUnauthorized: false },
+      (res) => {
+        res.destroy();
+        resolve('up');
+      }
+    );
+    req.on('timeout', () => req.destroy());
+    req.on('error', () => resolve('down'));
+    req.end();
+  });
+}
+
+async function refreshStatus() {
+  let runningNames = null;
+  try {
+    const containers = await dockerRequest('/containers/json');
+    runningNames = new Set(containers.map((c) => ((c.Names && c.Names[0]) || '').replace(/^\//, '')));
+  } catch {
+    runningNames = null; // Docker socket unavailable — fall back to HTTP checks for everyone
+  }
+
+  const currentApps = apps;
+  const results = await Promise.all(
+    currentApps.map(async (a) => {
+      if (a.containerName && runningNames) {
+        return [a.id, { state: runningNames.has(a.containerName) ? 'up' : 'down', source: 'docker' }];
+      }
+      const state = await checkHttpHealth(a.url);
+      return [a.id, { state, source: 'http' }];
+    })
+  );
+  statusMap = Object.fromEntries(results);
+}
+
+refreshStatus();
+setInterval(refreshStatus, STATUS_REFRESH_INTERVAL_MS);
+
+// Cached up/down status per app, refreshed in the background. Public since
+// it reveals nothing beyond what /api/apps already shows.
+app.get('/api/status', (req, res) => {
+  res.json(statusMap);
 });
 
 app.use((err, req, res, next) => {
